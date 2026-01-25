@@ -612,9 +612,10 @@ class HDTicket(Document):
 
         message = self.parse_content(message)
 
-        # Add signature from Email Account if available
-        if sender_email and sender_email.signature:
-            message = message + f"<br><br>{sender_email.signature}"
+        # Add signature from agent's User profile if available
+        agent_signature = frappe.db.get_value("User", sender, "email_signature")
+        if agent_signature:
+            message = message + f"<br><br>{agent_signature}"
 
         reply_to_email = sender_email.email_id
         rendered_template: str | None = None

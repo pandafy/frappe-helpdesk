@@ -706,56 +706,49 @@ class TestHDTicket(IntegrationTestCase):
             self.assertFalse(banner_shown)
 
     def test_email_signature_in_reply(self):
-        """Test that email signature from Email Account is appended to agent replies"""
-        # Create an email account with a signature
+        """Test that email signature from agent's User profile is appended to agent replies"""
+        # Set up test signature for the current user (agent)
         test_signature = "<p>Best regards,<br>Support Team<br>support@example.com</p>"
-        email_account = frappe.get_doc({
-            "doctype": "Email Account",
-            "email_id": "test_signature@example.com",
-            "email_account_name": "Test Signature Account",
-            "signature": test_signature,
-            "enable_outgoing": 1,
-            "enable_incoming": 0,
-        })
-        email_account.insert(ignore_if_duplicate=True)
+        current_user = frappe.session.user
         
-        # Create a ticket
-        ticket = make_ticket(description="Test ticket for signature")
+        # Save original signature to restore later
+        original_signature = frappe.db.get_value("User", current_user, "email_signature")
         
-        # Set the email account for this ticket
-        ticket.db_set("sender_email_account", email_account.name)
-        
-        # Mock the sender_email method to return our test email account
-        original_sender_email = ticket.sender_email
-        ticket.sender_email = lambda: email_account
-        
-        # Reply via agent with a test message
-        test_message = "<p>This is a test reply</p>"
-        
-        # Disable actual email sending
-        frappe.flags.skip_email_workflow = True
-        ticket.skip_email_workflow = lambda: True
+        # Set test signature for current user
+        frappe.db.set_value("User", current_user, "email_signature", test_signature)
         
         try:
-            ticket.reply_via_agent(message=test_message)
+            # Create a ticket
+            ticket = make_ticket(description="Test ticket for signature")
+            
+            # Reply via agent with a test message
+            test_message = "<p>This is a test reply</p>"
+            
+            # Disable actual email sending
+            frappe.flags.skip_email_workflow = True
+            ticket.skip_email_workflow = lambda: True
+            
+            try:
+                ticket.reply_via_agent(message=test_message)
+            finally:
+                frappe.flags.skip_email_workflow = False
+            
+            # Get the created communication
+            communication = frappe.get_last_doc("Communication", filters={
+                "reference_doctype": "HD Ticket",
+                "reference_name": ticket.name,
+                "sent_or_received": "Sent"
+            })
+            
+            # Verify the signature is in the communication content
+            self.assertIn(test_signature, communication.content)
+            self.assertIn(test_message, communication.content)
         finally:
-            # Restore original method
-            ticket.sender_email = original_sender_email
-            frappe.flags.skip_email_workflow = False
-        
-        # Get the created communication
-        communication = frappe.get_last_doc("Communication", filters={
-            "reference_doctype": "HD Ticket",
-            "reference_name": ticket.name,
-            "sent_or_received": "Sent"
-        })
-        
-        # Verify the signature is in the communication content
-        self.assertIn(test_signature, communication.content)
-        self.assertIn(test_message, communication.content)
-        
-        # Cleanup
-        frappe.delete_doc("Email Account", email_account.name, force=True)
+            # Restore original signature
+            if original_signature:
+                frappe.db.set_value("User", current_user, "email_signature", original_signature)
+            else:
+                frappe.db.set_value("User", current_user, "email_signature", None)
 
     def tearDown(self):
         remove_holidays()

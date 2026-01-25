@@ -15,7 +15,7 @@ from frappe.desk.form.assign_to import get as get_assignees
 from frappe.model.document import Document
 from frappe.permissions import add_permission, update_permission_property
 from frappe.query_builder import DocType, Order
-from frappe.utils import add_to_date, getdate, now_datetime
+from frappe.utils import add_to_date, getdate, now_datetime, sanitize_html
 from pypika.functions import Count
 from pypika.queries import Query
 from pypika.terms import Criterion
@@ -611,6 +611,17 @@ class HDTicket(Document):
             frappe.throw(_("Can not send email. No sender email set up!"))
 
         message = self.parse_content(message)
+
+        # Add signature from agent's User profile if available
+        agent_signature = frappe.db.get_value("User", sender, "email_signature")
+        if agent_signature:
+            # Sanitize HTML to prevent injection attacks
+            agent_signature = sanitize_html(agent_signature)
+            # Preserve line breaks by converting \n to <br> if signature is plain text
+            # Check if signature already contains HTML tags
+            if "\n" in agent_signature and not any(tag in agent_signature.lower() for tag in ["<br>", "<br/>", "<br ", "<p>", "<div>"]):
+                agent_signature = agent_signature.replace("\n", "<br>")
+            message = message + f"<br><br>{agent_signature}"
 
         reply_to_email = sender_email.email_id
         rendered_template: str | None = None

@@ -705,6 +705,96 @@ class TestHDTicket(IntegrationTestCase):
             banner_shown = show_outside_hours_banner(ticket.name)["show"]
             self.assertFalse(banner_shown)
 
+    def test_email_signature_in_reply(self):
+        """Test that email signature from agent's User profile is appended to agent replies"""
+        # Set up test signature for the current user (agent)
+        test_signature = "<p>Best regards,<br>Support Team<br>support@example.com</p>"
+        current_user = frappe.session.user
+        
+        # Save original signature to restore later
+        original_signature = frappe.db.get_value("User", current_user, "email_signature")
+        
+        # Set test signature for current user
+        frappe.db.set_value("User", current_user, "email_signature", test_signature)
+        
+        try:
+            # Create a ticket
+            ticket = make_ticket(description="Test ticket for signature")
+            
+            # Reply via agent with a test message
+            test_message = "<p>This is a test reply</p>"
+            
+            # Disable actual email sending
+            frappe.flags.skip_email_workflow = True
+            ticket.skip_email_workflow = lambda: True
+            
+            try:
+                ticket.reply_via_agent(message=test_message)
+            finally:
+                frappe.flags.skip_email_workflow = False
+            
+            # Get the created communication
+            communication = frappe.get_last_doc("Communication", filters={
+                "reference_doctype": "HD Ticket",
+                "reference_name": ticket.name,
+                "sent_or_received": "Sent"
+            })
+            
+            # Verify the signature is in the communication content
+            self.assertIn(test_signature, communication.content)
+            self.assertIn(test_message, communication.content)
+        finally:
+            # Restore original signature
+            if original_signature:
+                frappe.db.set_value("User", current_user, "email_signature", original_signature)
+            else:
+                frappe.db.set_value("User", current_user, "email_signature", None)
+
+    def test_email_signature_line_breaks_preserved(self):
+        """Test that line breaks in agent signature are preserved"""
+        # Test with plain text signature containing line breaks
+        test_signature_plain = "Best regards,\nJohn Doe\nSupport Team"
+        current_user = frappe.session.user
+        
+        # Save original signature to restore later
+        original_signature = frappe.db.get_value("User", current_user, "email_signature")
+        
+        # Set test signature with line breaks
+        frappe.db.set_value("User", current_user, "email_signature", test_signature_plain)
+        
+        try:
+            # Create a ticket
+            ticket = make_ticket(description="Test ticket for signature line breaks")
+            
+            # Reply via agent with a test message
+            test_message = "<p>This is a test reply</p>"
+            
+            # Disable actual email sending
+            frappe.flags.skip_email_workflow = True
+            ticket.skip_email_workflow = lambda: True
+            
+            try:
+                ticket.reply_via_agent(message=test_message)
+            finally:
+                frappe.flags.skip_email_workflow = False
+            
+            # Get the created communication
+            communication = frappe.get_last_doc("Communication", filters={
+                "reference_doctype": "HD Ticket",
+                "reference_name": ticket.name,
+                "sent_or_received": "Sent"
+            })
+            
+            # Verify line breaks are converted to <br> tags
+            self.assertIn("<br>", communication.content)
+            self.assertIn("Best regards,<br>John Doe<br>Support Team", communication.content)
+        finally:
+            # Restore original signature
+            if original_signature:
+                frappe.db.set_value("User", current_user, "email_signature", original_signature)
+            else:
+                frappe.db.set_value("User", current_user, "email_signature", None)
+
     def tearDown(self):
         remove_holidays()
         frappe.db.set_single_value("HD Settings", "default_ticket_status", "Open")

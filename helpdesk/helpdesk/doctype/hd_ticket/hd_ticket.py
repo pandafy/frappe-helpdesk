@@ -612,6 +612,10 @@ class HDTicket(Document):
 
         message = self.parse_content(message)
 
+        # Add signature from Email Account if available
+        if sender_email and sender_email.signature:
+            message = message + f"<br><br>{sender_email.signature}"
+
         reply_to_email = sender_email.email_id
         rendered_template: str | None = None
         if self.via_customer_portal:

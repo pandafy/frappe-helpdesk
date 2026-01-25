@@ -617,8 +617,9 @@ class HDTicket(Document):
         if agent_signature:
             # Sanitize HTML to prevent injection attacks
             agent_signature = sanitize_html(agent_signature)
-            # Preserve line breaks by converting \n to <br> if not already HTML
-            if "\n" in agent_signature and "<br" not in agent_signature.lower():
+            # Preserve line breaks by converting \n to <br> if signature is plain text
+            # Check if signature already contains HTML tags
+            if "\n" in agent_signature and not any(tag in agent_signature.lower() for tag in ["<br>", "<br/>", "<br ", "<p>", "<div>"]):
                 agent_signature = agent_signature.replace("\n", "<br>")
             message = message + f"<br><br>{agent_signature}"
 

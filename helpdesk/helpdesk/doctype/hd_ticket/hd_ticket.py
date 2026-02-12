@@ -20,7 +20,11 @@ from pypika.functions import Count
 from pypika.queries import Query
 from pypika.terms import Criterion
 
-from helpdesk.consts import DEFAULT_TICKET_PRIORITY, DEFAULT_TICKET_TYPE
+from helpdesk.consts import (
+    AUTOMATED_MESSAGE_COMMUNICATION_MEDIUM,
+    DEFAULT_TICKET_PRIORITY,
+    DEFAULT_TICKET_TYPE,
+)
 from helpdesk.helpdesk.doctype.hd_settings.helpers import (
     get_default_email_content,
     is_email_content_empty,
@@ -943,10 +947,12 @@ class HDTicket(Document):
             self.last_agent_response = frappe.utils.now_datetime()
 
             # TODO: remove this feature once we add automation feature
-            if frappe.db.get_single_value("HD Settings", "auto_update_status"):
-                self.status = frappe.db.get_single_value(
-                    "HD Settings", "update_status_to"
-                )
+            # Don't auto-update status if Communication Medium is Automated Message
+            if c.communication_medium != AUTOMATED_MESSAGE_COMMUNICATION_MEDIUM:
+                if frappe.db.get_single_value("HD Settings", "auto_update_status"):
+                    self.status = frappe.db.get_single_value(
+                        "HD Settings", "update_status_to"
+                    )
 
         # Fetch description from communication if not set already. This might not be needed
         # anymore as a communication is created when a ticket is created.

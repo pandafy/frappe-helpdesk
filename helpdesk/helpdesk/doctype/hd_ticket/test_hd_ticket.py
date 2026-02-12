@@ -705,6 +705,64 @@ class TestHDTicket(IntegrationTestCase):
             banner_shown = show_outside_hours_banner(ticket.name)["show"]
             self.assertFalse(banner_shown)
 
+    def test_auto_update_status_skip_for_automated_message(self):
+        # Test that auto update status doesn't trigger for automated messages
+        # Create a ticket
+        ticket = make_ticket()
+        initial_status = ticket.status
+
+        # Enable auto_update_status and set update_status_to
+        frappe.db.set_single_value("HD Settings", "auto_update_status", 1)
+        target_status = make_status(name="Auto Updated", category="Open")
+        frappe.db.set_single_value("HD Settings", "update_status_to", target_status.name)
+
+        # Create a communication with Automated Message medium
+        communication = frappe.get_doc(
+            {
+                "doctype": "Communication",
+                "communication_type": "Communication",
+                "communication_medium": "Automated Message",
+                "content": "This is an automated message",
+                "sent_or_received": "Sent",
+                "reference_doctype": "HD Ticket",
+                "reference_name": ticket.name,
+                "status": "Linked",
+            }
+        )
+        communication.insert(ignore_permissions=True)
+
+        # Trigger on_communication_update
+        ticket.reload()
+        ticket.on_communication_update(communication)
+
+        # Status should NOT be auto-updated for Automated Message
+        self.assertEqual(ticket.status, initial_status)
+
+        # Now test with Email medium (should auto-update)
+        email_communication = frappe.get_doc(
+            {
+                "doctype": "Communication",
+                "communication_type": "Communication",
+                "communication_medium": "Email",
+                "content": "This is an email",
+                "sent_or_received": "Sent",
+                "reference_doctype": "HD Ticket",
+                "reference_name": ticket.name,
+                "status": "Linked",
+            }
+        )
+        email_communication.insert(ignore_permissions=True)
+
+        ticket.reload()
+        ticket.on_communication_update(email_communication)
+
+        # Status SHOULD be auto-updated for Email
+        self.assertEqual(ticket.status, target_status.name)
+
+        # Clean up
+        frappe.db.set_single_value("HD Settings", "auto_update_status", 0)
+        frappe.delete_doc("HD Ticket Status", "Auto Updated", force=True)
+
     def tearDown(self):
         remove_holidays()
         frappe.db.set_single_value("HD Settings", "default_ticket_status", "Open")

@@ -7,6 +7,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, get_datetime, getdate, now_datetime
 
+from helpdesk.consts import AUTOMATED_MESSAGE_COMMUNICATION_MEDIUM
 from helpdesk.helpdesk.doctype.hd_ticket.api import (
     merge_ticket,
     show_outside_hours_banner,
@@ -721,7 +722,7 @@ class TestHDTicket(IntegrationTestCase):
             {
                 "doctype": "Communication",
                 "communication_type": "Communication",
-                "communication_medium": "Automated Message",
+                "communication_medium": AUTOMATED_MESSAGE_COMMUNICATION_MEDIUM,
                 "content": "This is an automated message",
                 "sent_or_received": "Sent",
                 "reference_doctype": "HD Ticket",

@@ -20,7 +20,11 @@ from pypika.functions import Count
 from pypika.queries import Query
 from pypika.terms import Criterion
 
-from helpdesk.consts import DEFAULT_TICKET_PRIORITY, DEFAULT_TICKET_TYPE
+from helpdesk.consts import (
+    AUTOMATED_MESSAGE_COMMUNICATION_MEDIUM,
+    DEFAULT_TICKET_PRIORITY,
+    DEFAULT_TICKET_TYPE,
+)
 from helpdesk.helpdesk.doctype.hd_settings.helpers import (
     get_default_email_content,
     is_email_content_empty,
@@ -946,7 +950,7 @@ class HDTicket(Document):
             # Don't auto-update status if Communication Type is Automated Message
             if (
                 frappe.db.get_single_value("HD Settings", "auto_update_status")
-                and c.communication_medium != "Automated Message"
+                and c.communication_medium != AUTOMATED_MESSAGE_COMMUNICATION_MEDIUM
             ):
                 self.status = frappe.db.get_single_value(
                     "HD Settings", "update_status_to"

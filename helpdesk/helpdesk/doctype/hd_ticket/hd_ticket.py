@@ -943,7 +943,11 @@ class HDTicket(Document):
             self.last_agent_response = frappe.utils.now_datetime()
 
             # TODO: remove this feature once we add automation feature
-            if frappe.db.get_single_value("HD Settings", "auto_update_status"):
+            # Don't auto-update status if Communication Type is Automated Message
+            if (
+                frappe.db.get_single_value("HD Settings", "auto_update_status")
+                and c.communication_medium != "Automated Message"
+            ):
                 self.status = frappe.db.get_single_value(
                     "HD Settings", "update_status_to"
                 )
